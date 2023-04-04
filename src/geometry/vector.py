@@ -4,7 +4,11 @@ import numpy as np
 
 
 class Vector:
-    def __init__(self, x, y, z):
+    def __init__(self, x=0, y=None, z=None, /):
+        if y is None:
+            y = z = x
+        elif z is None:
+            raise ValueError("You should specify either 1 or all 3 vector coordinates")
         self._data = np.array([x, y, z], dtype=float)
 
     def __repr__(self) -> str:

@@ -1,7 +1,6 @@
 import time
 
-from src import Color, Material, Sphere, Vector
-from src import CameraOptions, PointLight, Scene
+from src import CameraOptions, Color, Material, PointLight, Scene, Sphere, Vector
 
 
 def main() -> None:
@@ -21,12 +20,12 @@ def main() -> None:
     ))
     scene.add_light(PointLight(
         origin=Vector(-0.2, 0, 0),
-        intensity=Vector(0.5, 0.5, 0.5),
+        intensity=Vector(0.5),
     ))
 
     cam_options = CameraOptions(
-        screen_width=700,
-        screen_height=700,
+        screen_width=640,
+        screen_height=480,
     )
 
     start_ts = time.time()

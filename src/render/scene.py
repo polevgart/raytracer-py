@@ -1,5 +1,6 @@
 import attr
 import math
+import numpy as np
 import tqdm
 from PIL import Image
 
@@ -21,12 +22,8 @@ class CameraOptions:
     screen_width: float = attr.ib()
     screen_height: float = attr.ib()
     fov: float = attr.ib(default=math.pi / 2)
-    look_from: Vector = attr.ib()
+    look_from: Vector = attr.ib(factory=Vector)
     look_to: Vector = attr.ib()
-
-    @look_from.default
-    def _(self) -> Vector:
-        return Vector(0, 0, 0)
 
     @look_to.default
     def _(self) -> Vector:
@@ -46,7 +43,7 @@ class Scene:
 
     def find_closest_intersection(self, ray: Ray) -> tuple[Intersection, BaseObject]:
         intersected_obj = None
-        best_intersection: (Intersection | None) = None
+        best_intersection = None
         for obj in self.objects:
             intersection = obj.intersect(ray)
             if intersection is None:
@@ -75,29 +72,37 @@ class Scene:
                       inside: bool = False,
                       ) -> Vector:
         material = obj.material
-        pos = intersection.position
-        norm = intersection.normal
 
         # ambient shading
         intensity = material.ambient_color
 
         if not inside and material.albedo[0] > EPS:
+            pos = intersection.position
+            norm = intersection.normal
+
             view_dir = -ray.direction
             new_pos = pos + EPS * norm
+
+            diffuse_total = Color()
+            specular_total = Color()
+
             for light in self.lights:
                 light_dir = light.origin - new_pos
                 if not self.is_point_illuminated(new_pos, light_dir):
                     continue
                 light_dir.normalize()
+                print('Illuminated!')
 
                 # diffuse shading
-                diffuse_coef = light.intensity * max(0, norm.dot(light_dir))
-                intensity += diffuse_coef * material.albedo[0] * material.diffuse_color
+                diffuse_total += light.intensity * max(0, norm.dot(light_dir))
 
                 # specular shading
                 specular_dot = view_dir.dot(reflect(-light_dir, norm))
-                specular_coef = light.intensity * max(0, specular_dot) ** material.specular_exponent
-                intensity += specular_coef * material.albedo[0] * material.specular_color
+                specular_total += light.intensity * max(0, specular_dot) ** material.specular_exponent
+                print(light.intensity, diffuse_total, specular_total, material.albedo)
+
+            intensity += (material.albedo[0] * material.diffuse_color) * diffuse_total
+            intensity += (material.albedo[0] * material.specular_color) * specular_total
 
         return intensity
 
@@ -110,9 +115,11 @@ class Scene:
         if depth <= 1:
             return intensity
 
-        # reflection
         material = obj.material
+
+        # reflection
         if not inside and material.albedo[1] > EPS:
+            print('Reflect')
             new_dir = reflect(ray.direction, intersection.normal)
             new_ray = Ray(origin=intersecion.position + EPS * intersection.normal, direction=new_dir)
             reflected = self.trace_ray(new_ray, depth=depth - 1, inside=False)
@@ -121,6 +128,7 @@ class Scene:
 
         # refraction
         if inside or material.albedo[2] > EPS:
+            print('Refract')
             eta = material.refraction_index
             if not inside:
                 eta = 1 / eta
@@ -133,6 +141,19 @@ class Scene:
 
         return intensity
 
+    def tone_mapping(self, pixels):
+        scale = pixels.max()
+        for j, row in tqdm.tqdm(enumerate(pixels), desc='Tone mapping', total=len(pixels)):
+            for i, pixel in enumerate(row):
+                pixels[j, i] = pixel * (1 + pixel / (scale ** 2)) / (1 + pixel)
+
+    def gamma_correction(self, pixels, *, gamma: float = 2.2):
+        pixels **= 1 / gamma
+
+    def postprocess(self, pixels, *, gamma: float = 2.2):
+        self.tone_mapping(pixels)
+        self.gamma_correction(pixels, gamma=gamma)
+
     def render(self,
                cam_options: CameraOptions,
                background_color: Color = Color(0, 0, 0),
@@ -144,10 +165,10 @@ class Scene:
         scale = math.tan(cam_options.fov / 2)
         aspect_ratio = width / height
         cam_to_world = look_at(cam_options.look_from, cam_options.look_to)
-        origin = point_matrix_multiply(cam_to_world, Vector(0, 0, 0))
+        origin = point_matrix_multiply(cam_to_world, Vector())
 
-        img = Image.new("RGB", (width, height))
-        for j in tqdm.tqdm(range(height)):
+        pixels = np.empty((height, width, 3), dtype=float)
+        for j in tqdm.tqdm(range(height), desc='Ray tracing'):
             for i in range(width):
                 x = (2 * (i + 0.5) / width - 1) * aspect_ratio * scale
                 y = (1 - 2 * (j + 0.5) / height) * scale
@@ -157,8 +178,9 @@ class Scene:
                 pixel = self.trace_ray(ray, depth=depth)
                 if pixel is None:
                     pixel = background_color
-                img.putpixel((i, j), pixel.to_rgb())
+                pixels[j, i] = pixel.to_array()
 
-        # TODO: postprocess image: tone mapping + gamma correction
+        self.postprocess(pixels)
+
+        img = Image.fromarray(np.uint8(255 * pixels))
         return img
-

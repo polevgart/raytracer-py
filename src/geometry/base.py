@@ -13,10 +13,10 @@ class Color(Vector):
 
 @attr.s(slots=True, kw_only=True)
 class Material:
-    ambient_color: Color = attr.ib()
-    diffuse_color: Color = attr.ib()
-    specular_color: Color = attr.ib()
-    specular_exponent: float = attr.ib()
+    ambient_color: Color = attr.ib(factory=Color)
+    diffuse_color: Color = attr.ib(factory=Color)
+    specular_color: Color = attr.ib(factory=Color)
+    specular_exponent: float = attr.ib(default=0)
     refraction_index: float = attr.ib(default=1)
     albedo: Vector = attr.ib()
 
