@@ -74,7 +74,8 @@ class Scene:
         material = obj.material
 
         # ambient shading
-        intensity = material.ambient_color
+        intensity = Color()
+        intensity += material.ambient_color
 
         if not inside and material.albedo[0] > EPS:
             pos = intersection.position
@@ -91,7 +92,6 @@ class Scene:
                 if not self.is_point_illuminated(new_pos, light_dir):
                     continue
                 light_dir.normalize()
-                print('Illuminated!')
 
                 # diffuse shading
                 diffuse_total += light.intensity * max(0, norm.dot(light_dir))
@@ -99,7 +99,6 @@ class Scene:
                 # specular shading
                 specular_dot = view_dir.dot(reflect(-light_dir, norm))
                 specular_total += light.intensity * max(0, specular_dot) ** material.specular_exponent
-                print(light.intensity, diffuse_total, specular_total, material.albedo)
 
             intensity += (material.albedo[0] * material.diffuse_color) * diffuse_total
             intensity += (material.albedo[0] * material.specular_color) * specular_total
@@ -119,7 +118,6 @@ class Scene:
 
         # reflection
         if not inside and material.albedo[1] > EPS:
-            print('Reflect')
             new_dir = reflect(ray.direction, intersection.normal)
             new_ray = Ray(origin=intersecion.position + EPS * intersection.normal, direction=new_dir)
             reflected = self.trace_ray(new_ray, depth=depth - 1, inside=False)
@@ -128,7 +126,6 @@ class Scene:
 
         # refraction
         if inside or material.albedo[2] > EPS:
-            print('Refract')
             eta = material.refraction_index
             if not inside:
                 eta = 1 / eta
@@ -180,7 +177,7 @@ class Scene:
                     pixel = background_color
                 pixels[j, i] = pixel.to_array()
 
-        self.postprocess(pixels)
+        self.postprocess(np.clip(0, 1, pixels))
 
         img = Image.fromarray(np.uint8(255 * pixels))
         return img

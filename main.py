@@ -5,10 +5,10 @@ from src import CameraOptions, Color, Material, PointLight, Scene, Sphere, Vecto
 
 def main() -> None:
     red = Material(
-        ambient_color=Color(0.5, 0, 0),
+        ambient_color=Color(0.1, 0, 0),
         diffuse_color=Color(0.5, 0, 0),
         specular_color=Color(0.5, 0, 0),
-        specular_exponent=500,
+        specular_exponent=7,
         # refraction_index=1,
     )
 
