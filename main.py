@@ -1,32 +1,40 @@
 import time
-import geometry
-from scene import Scene
+
+from src import Color, Material, Sphere, Vector
+from src import CameraOptions, PointLight, Scene
 
 
-def main():    
-    red = geometry.Material(color=geometry.Color(230, 0, 0))
-    blue = geometry.Material(color=geometry.Color(0, 0, 230))
-    green = geometry.Material(color=geometry.Color(0, 230, 0))
-    yellow = geometry.Material(color=geometry.Color(230, 230, 0))
-    orange = geometry.Material(color=geometry.Color(230, 140, 0))
+def main() -> None:
+    red = Material(
+        ambient_color=Color(0.5, 0, 0),
+        diffuse_color=Color(0.5, 0, 0),
+        specular_color=Color(0.5, 0, 0),
+        specular_exponent=500,
+        # refraction_index=1,
+    )
 
-    scene = Scene(depth=2)
-    scene.add_object(geometry.Sphere(center=geometry.Vector(1.5, -1, 6), radius=1, material=red))
-    pixels = 700, 700
+    scene = Scene()
+    scene.add_object(Sphere(
+        center=Vector(-0.35, 0, -0.5),
+        radius=0.15,
+        material=red,
+    ))
+    scene.add_light(PointLight(
+        origin=Vector(-0.2, 0, 0),
+        intensity=Vector(0.5, 0.5, 0.5),
+    ))
+
+    cam_options = CameraOptions(
+        screen_width=700,
+        screen_height=700,
+    )
+
     start_ts = time.time()
-    from pycallgraph import PyCallGraph
-    from pycallgraph.output import GraphvizOutput
-
-    with PyCallGraph(output=GraphvizOutput()):
-        scene.render(pixels, (1, 1))
-        
+    img = scene.render(cam_options, depth=1)
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
-    # img.save("kekkok.bmp")
-    # img.save("kekkok.jpg")
-    # img.save("kekkok.png")
-    # img.show()
+    img.save("image.png")
 
 
 if __name__ == "__main__":
