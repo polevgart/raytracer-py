@@ -288,7 +288,7 @@ def test_sphere(output_path="image.png", parallel=False) -> None:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("test_name", choices=["sphere", "box", "triangle", "invisible_triangle"])
+    parser.add_argument("test_name", choices=["sphere", "box", "triangle", "invisible_triangle", "all"])
     parser.add_argument("-o", "--output", help="Path to save image", default="image.png")
     parser.add_argument("--parallel", help="Trace rays parallel", action="store_true")
     return parser.parse_args()
@@ -296,12 +296,13 @@ def parse_args():
 
 def main() -> None:
     args = parse_args()
-    globals()["test_" + args.test_name](args.output, args.parallel)
-    # with PyCallGraph(output=GraphvizOutput()):
-        # test_sphere()
-        # test_box()
-        # test_triangle()
-        # test_invisible_triangle()
+    if args.test_name == "all":
+        test_sphere(args.output, args.parallel)
+        test_box(args.output, args.parallel)
+        test_triangle(args.output, args.parallel)
+        test_invisible_triangle(args.output, args.parallel)
+    else:
+        globals()["test_" + args.test_name](args.output, args.parallel)
 
 
 if __name__ == "__main__":
