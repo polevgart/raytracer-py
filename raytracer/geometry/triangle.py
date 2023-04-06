@@ -1,5 +1,4 @@
 import attr
-from functools import cached_property
 from typing import Any, Sequence
 
 from .vector import Vector
@@ -25,7 +24,7 @@ class Triangle(BaseObject):
         super().__init__(**kwargs)
         self._vertices=vertices
 
-    @cached_property
+    @property
     def area(self) -> float:
         return get_triangle_area(*self._vertices)
 

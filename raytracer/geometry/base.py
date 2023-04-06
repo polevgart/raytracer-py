@@ -1,5 +1,4 @@
 import attr
-import numpy as np
 
 from .ray import Ray
 from .vector import Vector

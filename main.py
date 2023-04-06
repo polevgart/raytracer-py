@@ -121,11 +121,6 @@ def test_box() -> None:
         albedo=Vector(0.8, 0, 0),
         specular_exponent=10,
     )
-    wall_behind_mtl = Material(
-        diffuse_color=Vector(0.2, 0.7, 0.8),
-        specular_color=Vector(0, 0, 0),
-        specular_exponent=10,
-    )
 
     # spheres
     scene.add_object(Sphere(
@@ -215,21 +210,6 @@ def test_box() -> None:
         material=left_wall_mtl,
     ))
 
-    scene.add_object(Triangle([
-            Vector(-1.02, 1.59, 0.99),
-            Vector(-1.01, 0, 0.99),
-            Vector(1, 0, 0.99),
-        ],
-        material=wall_behind_mtl,
-    ))
-    scene.add_object(Triangle([
-            Vector(1, 0, 0.99),
-            Vector(1, 1.59, 0.99),
-            Vector(-1.02, 1.59, 0.99),
-        ],
-        material=wall_behind_mtl,
-    ))
-
     # light
     scene.add_light(PointLight(
         origin=Vector(0, 1.5899, 0),
@@ -306,10 +286,10 @@ def test_sphere() -> None:
 
 
 def main() -> None:
-    with PyCallGraph(output=GraphvizOutput()):
+    # with PyCallGraph(output=GraphvizOutput()):
         # test_sphere()
-        # test_box()
-        test_triangle()
+        test_box()
+        # test_triangle()
         # test_invisible_triangle()
 
 

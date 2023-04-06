@@ -1,34 +1,28 @@
 import copy
 import math
 import numpy as np
+import operator
+from typing import Any, Callable
 
-from typing import Any
+
+BinaryOp = Callable[[float, float], float]
+
+
+def zip_tuples(op: BinaryOp, lhs: tuple[float], rhs: tuple[float]) -> tuple[float]:
+    return tuple(map(op, lhs, rhs))
 
 
 class Vector:
-    def __init__(
-        self,
-        x: float = 0,
-        y: float | None = None,
-        z: float | None = None,
-        /,
-        empty: bool = False,
-    ):
-        if not empty:
-            if y is None:
-                y = z = x
-            elif z is None:
-                raise ValueError("You should specify either 1 or all 3 vector coordinates")
-            self._data = np.array([x, y, z], dtype=float)
+    def __init__(self, x: float = 0, y: float | None = None, z: float | None = None, /):
+        if y is None:
+            y = z = x
+        elif z is None:
+            raise ValueError("You should specify either 1 or all 3 vector coordinates")
+        self._data = (x, y, z)
 
     @classmethod
     def from_array(cls, arr) -> "Vector":
-        vec = cls(empty=True)
-        vec._data = arr.copy()
-        return vec
-
-    def clone(self) -> "Vector":
-        return Vector.from_array(self._data)
+        return cls(*arr)
 
     def __repr__(self) -> str:
         coords_repr = ", ".join("{:.2f}".format(coord) for coord in self._data)
@@ -51,74 +45,65 @@ class Vector:
 
     @property
     def length(self) -> float:
-        return math.sqrt(self._data @ self._data)
+        return math.sqrt(self.dot(self))
 
     def normalize(self) -> "Vector":
-        self._data /= self.length
+        length = self.length
+        self._data = tuple(coord / length for coord in self._data)
         return self
 
     def dot(self, other: "Vector") -> float:
-        return self._data @ other._data
+        return sum(zip_tuples(operator.mul, self._data, other._data))
 
     def cross(self, other: "Vector") -> "Vector":
-        return Vector.from_array(np.cross(self._data, other._data))
+        return Vector(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
 
     def __add__(self, other: "Vector") -> "Vector":
-        result = self.clone()
-        result += other
-        return result
+        return Vector(*zip_tuples(operator.add, self._data, other._data))
 
     def __iadd__(self, other: "Vector") -> "Vector":
-        self._data += other._data
+        self._data = zip_tuples(operator.add, self._data, other._data)
         return self
 
     def __sub__(self, other: "Vector") -> "Vector":
-        result = self.clone()
-        result -= other
-        return result
+        return Vector(*zip_tuples(operator.sub, self._data, other._data))
 
     def __isub__(self, other: "Vector") -> "Vector":
-        self._data -= other._data
+        self._data = zip_tuples(operator.sub, self._data, other._data)
         return self
 
     def __neg__(self) -> "Vector":
-        result = self.clone()
-        result._data *= -1
-        return result
+        return Vector(*(-coord for coord in self._data))
 
     def __mul__(self, other: float) -> "Vector":
-        result = self.clone()
-        result._data *= other
-        return result
+        return Vector(*(coord * other for coord in self._data))
 
     def hadamard(self, other: "Vector") -> "Vector":
-        result = self.clone()
-        result._data *= other._data
-        return result
+        return Vector(*zip_tuples(operator.mul, self._data, other._data))
 
     def __rmul__(self, other: float) -> "Vector":
-        result = self.clone()
-        result._data *= other
-        return result
+        return Vector(*(coord * other for coord in self._data))
 
     def __imul__(self, other: float) -> "Vector":
-        self._data *= other
+        self._data = tuple(coord * other for coord in self._data)
         return self
 
     def __truediv__(self, other: float) -> "Vector":
-        result = self.clone()
-        result._data /= other
-        return result
+        return Vector(*(coord / other for coord in self._data))
 
     def __itruediv__(self, other: float) -> "Vector":
-        self._data /= other
+        self._data = tuple(coord / other for coord in self._data)
         return self
 
     def to_tuple(self) -> tuple[float]:
-        return tuple(self._data)
+        return tuple(float(coord) for coord in self._data)
 
     def to_array(self):
-        return self._data.copy()
+        return np.array(self._data, dtype=float)
 
     def __eq__(self, other: "Vector") -> bool:
         return np.allclose(self._data, other._data)
