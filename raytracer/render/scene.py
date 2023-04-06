@@ -5,7 +5,6 @@ import tqdm
 import multiprocessing
 
 from PIL import Image
-from concurrent import futures
 
 from ..geometry import BaseObject, Intersection, Ray, Vector, reflect, refract
 from .matrix import look_at, point_matrix_multiply, vector_matrix_multiply
@@ -31,34 +30,6 @@ class CameraOptions:
     @look_to.default
     def _(self) -> Vector:
         return Vector(0, 0, -1)
-
-
-_SCENE: 'Scene' = None
-_RENDER_SETTINGS: 'RenderSettings' = None
-
-
-@attr.s(slots=True)
-class RenderSettings:
-    cam_options: CameraOptions = attr.ib()
-    eps: float = attr.ib()
-    background_color: Vector = attr.ib()
-    depth = attr.ib()
-
-    width = attr.ib(default=None)
-    height = attr.ib(default=None)
-    aspect_ratio = attr.ib(default=None)
-    scale = attr.ib(default=None)
-    cam_to_world = attr.ib(default=None)
-    origin = attr.ib(default=None)
-
-    def __attrs_post_init__(self):
-        self.width = self.cam_options.screen_width
-        self.height = self.cam_options.screen_height
-    
-        self.scale = math.tan(self.cam_options.fov / 2)
-        self.aspect_ratio = self.width / self.height
-        self.cam_to_world = look_at(self.cam_options.look_from, self.cam_options.look_to, eps=self.eps)
-        self.origin = point_matrix_multiply(self.cam_to_world, Vector())
 
 
 @attr.s(slots=True, kw_only=True)
@@ -236,6 +207,34 @@ class Scene:
 
         img = Image.fromarray(np.uint8(255 * np.clip(0, 1, pixels)))
         return img
+
+
+_SCENE: 'Scene' = None
+_RENDER_SETTINGS: 'RenderSettings' = None
+
+
+@attr.s(slots=True)
+class RenderSettings:
+    cam_options: CameraOptions = attr.ib()
+    eps: float = attr.ib()
+    background_color: Vector = attr.ib()
+    depth = attr.ib()
+
+    width = attr.ib(default=None)
+    height = attr.ib(default=None)
+    aspect_ratio = attr.ib(default=None)
+    scale = attr.ib(default=None)
+    cam_to_world = attr.ib(default=None)
+    origin = attr.ib(default=None)
+
+    def __attrs_post_init__(self):
+        self.width = self.cam_options.screen_width
+        self.height = self.cam_options.screen_height
+    
+        self.scale = math.tan(self.cam_options.fov / 2)
+        self.aspect_ratio = self.width / self.height
+        self.cam_to_world = look_at(self.cam_options.look_from, self.cam_options.look_to, eps=self.eps)
+        self.origin = point_matrix_multiply(self.cam_to_world, Vector())
 
 
 def _process_line(j):
