@@ -2,7 +2,10 @@ import attr
 import math
 import numpy as np
 import tqdm
+import multiprocessing
+
 from PIL import Image
+from concurrent import futures
 
 from ..geometry import BaseObject, Intersection, Ray, Vector, reflect, refract
 from .matrix import look_at, point_matrix_multiply, vector_matrix_multiply
@@ -28,6 +31,34 @@ class CameraOptions:
     @look_to.default
     def _(self) -> Vector:
         return Vector(0, 0, -1)
+
+
+_SCENE: 'Scene' = None
+_RENDER_SETTINGS: 'RenderSettings' = None
+
+
+@attr.s(slots=True)
+class RenderSettings:
+    cam_options: CameraOptions = attr.ib()
+    eps: float = attr.ib()
+    background_color: Vector = attr.ib()
+    depth = attr.ib()
+
+    width = attr.ib(default=None)
+    height = attr.ib(default=None)
+    aspect_ratio = attr.ib(default=None)
+    scale = attr.ib(default=None)
+    cam_to_world = attr.ib(default=None)
+    origin = attr.ib(default=None)
+
+    def __attrs_post_init__(self):
+        self.width = self.cam_options.screen_width
+        self.height = self.cam_options.screen_height
+    
+        self.scale = math.tan(self.cam_options.fov / 2)
+        self.aspect_ratio = self.width / self.height
+        self.cam_to_world = look_at(self.cam_options.look_from, self.cam_options.look_to, eps=self.eps)
+        self.origin = point_matrix_multiply(self.cam_to_world, Vector())
 
 
 @attr.s(slots=True, kw_only=True)
@@ -184,28 +215,45 @@ class Scene:
         if background_color is None:
             background_color = Vector(0, 0, 0)
 
-        width = cam_options.screen_width
-        height = cam_options.screen_height
+        global _RENDER_SETTINGS, _SCENE
+        _SCENE = self
+        _RENDER_SETTINGS = RenderSettings(
+            cam_options, eps, background_color, depth
+        )
+        width, height = _RENDER_SETTINGS.width, _RENDER_SETTINGS.height
 
-        scale = math.tan(cam_options.fov / 2)
-        aspect_ratio = width / height
-        cam_to_world = look_at(cam_options.look_from, cam_options.look_to, eps=eps)
-        origin = point_matrix_multiply(cam_to_world, Vector())
+        results = []
+        pool = multiprocessing.Pool()
+        for j in tqdm.tqdm(range(height), desc="Ray tracing", disable=not verbose):
+            results.append(pool.apply_async(_process_line, (j,)))
 
         pixels = np.empty((height, width, 3), dtype=float)
-        for j in tqdm.tqdm(range(height), desc='Ray tracing', disable=not verbose):
-            for i in range(width):
-                x = (2 * (i + 0.5) / width - 1) * aspect_ratio * scale
-                y = (1 - 2 * (j + 0.5) / height) * scale
-                direction = vector_matrix_multiply(cam_to_world, Vector(x, y, -1))
-                ray = Ray(origin=origin, direction=direction)
-
-                pixel = self.trace_ray(ray, depth=depth, eps=eps)
-                if pixel is None:
-                    pixel = background_color
-                pixels[j, i] = pixel.to_array()
+        for res in tqdm.tqdm(results, total=len(results), desc="Processing results"):
+            j, line = res.get()
+            pixels[j] = line
 
         self.postprocess(pixels, verbose=verbose, eps=eps)
 
         img = Image.fromarray(np.uint8(255 * np.clip(0, 1, pixels)))
         return img
+
+
+def _process_line(j):
+    line = np.empty((_RENDER_SETTINGS.width, 3), dtype=float)
+    for i in range(_RENDER_SETTINGS.width):
+        line[i] = _process_pixel(i, j)
+
+    return j, line
+
+
+def _process_pixel(i, j):
+    x = (2 * (i + 0.5) / _RENDER_SETTINGS.width - 1) * _RENDER_SETTINGS.aspect_ratio * _RENDER_SETTINGS.scale
+    y = (1 - 2 * (j + 0.5) / _RENDER_SETTINGS.height) * _RENDER_SETTINGS.scale
+    direction = vector_matrix_multiply(_RENDER_SETTINGS.cam_to_world, Vector(x, y, -1))
+    ray = Ray(origin=_RENDER_SETTINGS.origin, direction=direction)
+
+    pixel = _SCENE.trace_ray(ray, depth=_RENDER_SETTINGS.depth, eps=_RENDER_SETTINGS.eps)
+    if pixel is None:
+        pixel = _RENDER_SETTINGS.background_color
+
+    return pixel.to_array()

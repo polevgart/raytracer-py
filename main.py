@@ -1,5 +1,6 @@
 import math
 import time
+import argparse
 
 from pycallgraph import PyCallGraph
 from pycallgraph.output import GraphvizOutput
@@ -7,7 +8,7 @@ from pycallgraph.output import GraphvizOutput
 from raytracer import CameraOptions, Material, PointLight, Scene, Sphere, Triangle, Vector
 
 
-def test_triangle() -> None:
+def test_triangle(output_path="image.png") -> None:
     material = Material(
         diffuse_color=Vector(0, 0, 1),
     )
@@ -38,10 +39,10 @@ def test_triangle() -> None:
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
-    img.save("image.png")
+    img.save(output_path)
 
 
-def test_invisible_triangle() -> None:
+def test_invisible_triangle(output_path="image.png") -> None:
     material = Material(
         diffuse_color=Vector(0, 0, 1),
     )
@@ -72,10 +73,10 @@ def test_invisible_triangle() -> None:
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
-    img.save("image.png")
+    img.save(output_path)
 
 
-def test_box() -> None:
+def test_box(output_path="image.png") -> None:
     scene = Scene()
 
     # materials
@@ -234,10 +235,10 @@ def test_box() -> None:
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
-    img.save("image.png")
+    img.save(output_path)
 
 
-def test_sphere() -> None:
+def test_sphere(output_path="image.png") -> None:
     ambient = Material(
         ambient_color=Vector(0.5, 0, 0),
     )
@@ -282,13 +283,22 @@ def test_sphere() -> None:
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
-    img.save("image.png")
+    img.save(output_path)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("test_name", choices=["sphere", "box", "triangle", "invisible_triangle"])
+    parser.add_argument("-o", "--output", help="Path to save image", default="image.png")
+    return parser.parse_args()
 
 
 def main() -> None:
+    args = parse_args()
+    globals()["test_" + args.test_name](args.output)
     # with PyCallGraph(output=GraphvizOutput()):
         # test_sphere()
-        test_box()
+        # test_box()
         # test_triangle()
         # test_invisible_triangle()
 
