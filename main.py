@@ -8,7 +8,7 @@ from pycallgraph.output import GraphvizOutput
 from raytracer import CameraOptions, Material, PointLight, Scene, Sphere, Triangle, Vector
 
 
-def test_triangle(output_path="image.png") -> None:
+def test_triangle(output_path="image.png", parallel=False) -> None:
     material = Material(
         diffuse_color=Vector(0, 0, 1),
     )
@@ -35,14 +35,14 @@ def test_triangle(output_path="image.png") -> None:
     )
 
     start_ts = time.time()
-    img = scene.render(cam_options, depth=1)
+    img = scene.render(cam_options, depth=1, parallel=parallel)
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
     img.save(output_path)
 
 
-def test_invisible_triangle(output_path="image.png") -> None:
+def test_invisible_triangle(output_path="image.png", parallel=False) -> None:
     material = Material(
         diffuse_color=Vector(0, 0, 1),
     )
@@ -69,14 +69,14 @@ def test_invisible_triangle(output_path="image.png") -> None:
     )
 
     start_ts = time.time()
-    img = scene.render(cam_options, depth=1)
+    img = scene.render(cam_options, depth=1, parallel=parallel)
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
     img.save(output_path)
 
 
-def test_box(output_path="image.png") -> None:
+def test_box(output_path="image.png", parallel=False) -> None:
     scene = Scene()
 
     # materials
@@ -231,14 +231,14 @@ def test_box(output_path="image.png") -> None:
     )
 
     start_ts = time.time()
-    img = scene.render(cam_options, depth=4)
+    img = scene.render(cam_options, depth=4, parallel=parallel)
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
     img.save(output_path)
 
 
-def test_sphere(output_path="image.png") -> None:
+def test_sphere(output_path="image.png", parallel=False) -> None:
     ambient = Material(
         ambient_color=Vector(0.5, 0, 0),
     )
@@ -279,7 +279,7 @@ def test_sphere(output_path="image.png") -> None:
     )
 
     start_ts = time.time()
-    img = scene.render(cam_options, depth=1)
+    img = scene.render(cam_options, depth=1, parallel=parallel)
     end_ts = time.time()
 
     print("Elapsed time:", end_ts - start_ts)
@@ -290,12 +290,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("test_name", choices=["sphere", "box", "triangle", "invisible_triangle"])
     parser.add_argument("-o", "--output", help="Path to save image", default="image.png")
+    parser.add_argument("--parallel", help="Trace rays parallel", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    globals()["test_" + args.test_name](args.output)
+    globals()["test_" + args.test_name](args.output, args.parallel)
     # with PyCallGraph(output=GraphvizOutput()):
         # test_sphere()
         # test_box()

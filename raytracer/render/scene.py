@@ -182,6 +182,7 @@ class Scene:
                depth: float = 3,
                verbose: bool = True,
                eps: float = EPS,
+               parallel=False,
                ) -> Image.Image:
         if background_color is None:
             background_color = Vector(0, 0, 0)
@@ -192,16 +193,20 @@ class Scene:
             cam_options, eps, background_color, depth
         )
         width, height = _RENDER_SETTINGS.width, _RENDER_SETTINGS.height
-
-        results = []
-        pool = multiprocessing.Pool()
-        for j in tqdm.tqdm(range(height), desc="Ray tracing", disable=not verbose):
-            results.append(pool.apply_async(_process_line, (j,)))
-
         pixels = np.empty((height, width, 3), dtype=float)
-        for res in tqdm.tqdm(results, total=len(results), desc="Processing results"):
-            j, line = res.get()
-            pixels[j] = line
+        if parallel:
+            results = []
+            pool = multiprocessing.Pool()
+            for j in tqdm.tqdm(range(height), desc="Pool preparation", disable=not verbose):
+                results.append(pool.apply_async(_process_line, (j,)))
+
+            for res in tqdm.tqdm(results, total=len(results), desc="Ray tracing"):
+                j, line = res.get()
+                pixels[j] = line
+        else:
+            for j in tqdm.tqdm(range(height), desc="Ray tracing", disable=not verbose):
+                pixels[j] = _process_line(j)[-1]
+
 
         self.postprocess(pixels, verbose=verbose, eps=eps)
 
