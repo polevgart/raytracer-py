@@ -5,17 +5,11 @@ from .ray import Ray
 from .vector import Vector
 
 
-class Color(Vector):
-    def to_rgb(self) -> tuple[int]:
-        values = np.clip(self._data * 255, 0, 255)
-        return tuple(map(int, values))
-
-
 @attr.s(slots=True, kw_only=True)
 class Material:
-    ambient_color: Color = attr.ib(factory=Color)
-    diffuse_color: Color = attr.ib(factory=Color)
-    specular_color: Color = attr.ib(factory=Color)
+    ambient_color: Vector = attr.ib(factory=Vector)
+    diffuse_color: Vector = attr.ib(factory=Vector)
+    specular_color: Vector = attr.ib(factory=Vector)
     specular_exponent: float = attr.ib(default=0)
     refraction_index: float = attr.ib(default=1)
     albedo: Vector = attr.ib()

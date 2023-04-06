@@ -33,8 +33,10 @@ class Sphere(base.BaseObject):
     radius: float = attr.ib(converter=float)
 
     def intersect(self, ray: base.Ray) -> base.Intersection | None:
-        dpos = ray.origin - self.center
+        origin = ray.origin
         dir = ray.direction
+
+        dpos = origin - self.center
         a = dir.dot(dir)
         b = 2 * dpos.dot(dir)
         c = dpos.dot(dpos) - self.radius ** 2
@@ -46,7 +48,7 @@ class Sphere(base.BaseObject):
         if distance < 0:
             return None
 
-        point = ray.origin + dir * distance
+        point = origin + distance * dir
         normal = self.get_normal(point)
         if c < 0:
             normal *= -1

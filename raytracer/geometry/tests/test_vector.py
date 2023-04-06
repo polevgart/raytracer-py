@@ -9,7 +9,7 @@ class TestVector:
     def test_length(self):
         assert Vector(0, 1, 0).length == 1.0
         assert Vector(3, 4, 0).length == 5.0
-        assert Vector(1, 1, 1).length - math.sqrt(3) < 0.00000001
+        assert abs(Vector(1, 1, 1).length - math.sqrt(3)) < 0.00000001
 
     def test_normalize(self):
         v = Vector(3, 4, 0)

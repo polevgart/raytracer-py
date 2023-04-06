@@ -56,7 +56,11 @@ class TestTriangle:
         assert np.allclose(intersection.distance, 1)
 
     def test_barycentric_coords(self):
-        triangle = Triangle([Vector(0, 0, 0), Vector(2, 0, 0), Vector(0, 2, 0)])
+        triangle = Triangle([
+            Vector(0, 0, 0),
+            Vector(2, 0, 0),
+            Vector(0, 2, 0),
+        ])
         on_edge = triangle.get_barycentric_coords(Vector(1, 1, 0))
         assert np.allclose(on_edge.y, 0.5)
         assert np.allclose(on_edge.z, 0.5)
