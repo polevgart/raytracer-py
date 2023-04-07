@@ -1,14 +1,13 @@
-import copy
 import math
 import numpy as np
 import operator
-from typing import Any, Callable
+from typing import Callable
 
 
 BinaryOp = Callable[[float, float], float]
 
 
-def zip_tuples(op: BinaryOp, lhs: tuple[float], rhs: tuple[float]) -> tuple[float]:
+def zip_tuples(op: BinaryOp, lhs: tuple[float], rhs: tuple[float]) -> tuple[float, ...]:
     return tuple(map(op, lhs, rhs))
 
 
@@ -99,7 +98,7 @@ class Vector:
         self._data = tuple(coord / other for coord in self._data)
         return self
 
-    def to_tuple(self) -> tuple[float]:
+    def to_tuple(self) -> tuple[float, ...]:
         return tuple(float(coord) for coord in self._data)
 
     def to_array(self):

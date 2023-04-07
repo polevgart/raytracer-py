@@ -1,7 +1,6 @@
-import attr
 import numpy as np
 
-from .. import *
+from .. import Ray, Sphere, Triangle, Vector
 
 
 class TestSphere:
