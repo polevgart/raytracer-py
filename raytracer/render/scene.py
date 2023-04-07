@@ -35,6 +35,8 @@ class Scene:
     objects: list[BaseObject] = attr.ib(factory=list, init=False)
     lights: list[PointLight] = attr.ib(factory=list, init=False)
 
+    _cached_last_intersected: BaseObject = attr.ib(default=None, init=False)
+
     def add_object(self, obj: BaseObject) -> None:
         self.objects.append(obj)
 
@@ -49,7 +51,6 @@ class Scene:
             if intersection is None:
                 continue
             if best_intersection is None or best_intersection.distance > intersection.distance:
-                # recalculate normal for triangle
                 best_intersection = intersection
                 intersected_obj = obj
 
@@ -58,10 +59,20 @@ class Scene:
     def is_point_illuminated(self, point: Vector, light_dir: Vector) -> bool:
         ray = Ray(origin=point, direction=light_dir)
         light_dist = light_dir.length
-        for obj in self.objects:
-            intersection = obj.intersect(ray)
+        if self._cached_last_intersected is not None:
+            intersection = self._cached_last_intersected.intersect(ray)
             if intersection is not None and intersection.distance < light_dist:
                 return False
+
+        for obj in self.objects:
+            if obj is self._cached_last_intersected:
+                continue
+            intersection = obj.intersect(ray)
+            if intersection is not None and intersection.distance < light_dist:
+                self._cached_last_intersected = obj
+                return False
+
+        self._cached_last_intersected = None
         return True
 
     def get_intensity(self,
