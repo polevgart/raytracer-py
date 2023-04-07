@@ -11,6 +11,8 @@ from .matrix import look_at, point_matrix_multiply, vector_matrix_multiply
 
 
 EPS = 1e-8
+NONE_VECTOR = Vector(-3.14)
+NONE_ARRAY = NONE_VECTOR.to_array()
 
 
 @attr.s(slots=True, kw_only=True)
@@ -37,7 +39,7 @@ class Scene:
     objects: list[BaseObject] = attr.ib(factory=list, init=False)
     lights: list[PointLight] = attr.ib(factory=list, init=False)
 
-    _cached_last_intersected: BaseObject = attr.ib(default=None, init=False)
+    _cached_last_intersected: BaseObject | None = attr.ib(default=None, init=False)
 
     def add_object(self, obj: BaseObject) -> None:
         self.objects.append(obj)
@@ -45,7 +47,7 @@ class Scene:
     def add_light(self, light: PointLight) -> None:
         self.lights.append(light)
 
-    def find_closest_intersection(self, ray: Ray) -> tuple[Intersection, BaseObject]:
+    def find_closest_intersection(self, ray: Ray) -> tuple[Intersection | None, BaseObject | None]:
         intersected_obj = None
         best_intersection = None
         for obj in self.objects:
@@ -91,7 +93,7 @@ class Scene:
         intensity = Vector()
         intensity += material.ambient_color
 
-        if not inside and material.albedo[0] > eps:
+        if not inside and material.albedo.x > eps:
             pos = intersection.position
             norm = intersection.normal
 
@@ -114,8 +116,8 @@ class Scene:
                 specular_dot = view_dir.dot(reflect(-light_dir, norm))
                 specular_total += max(0, specular_dot) ** material.specular_exponent * light.intensity
 
-            intensity += material.albedo[0] * material.diffuse_color.hadamard(diffuse_total)
-            intensity += material.albedo[0] * material.specular_color.hadamard(specular_total)
+            intensity += material.albedo.x * material.diffuse_color.hadamard(diffuse_total)
+            intensity += material.albedo.x * material.specular_color.hadamard(specular_total)
 
         return intensity
 
@@ -131,49 +133,48 @@ class Scene:
         material = obj.material
 
         # reflection
-        if not inside and material.albedo[1] > eps:
+        if not inside and material.albedo.y > eps:
             new_dir = reflect(ray.direction, intersection.normal)
-            new_ray = Ray(origin=intersection.position + eps * intersection.normal, direction=new_dir)
+            new_pos = intersection.position + eps * intersection.normal
+            new_ray = Ray(origin=new_pos, direction=new_dir)
             reflected = self.trace_ray(new_ray, depth=depth - 1, inside=False, eps=eps)
             if reflected is not None:
-                intensity += material.albedo[1] * reflected
+                intensity += material.albedo.y * reflected
 
         # refraction
-        if inside or material.albedo[2] > eps:
+        if inside or material.albedo.z > eps:
             eta = material.refraction_index
             if not inside:
                 eta = 1 / eta
-            new_dir = refract(ray.direction, intersection.normal, eta)
+            new_dir: Vector | None = refract(ray.direction, intersection.normal, eta)
             if new_dir is not None:
-                new_ray = Ray(origin=intersection.position - eps * intersection.normal, direction=new_dir)
+                new_pos = intersection.position - eps * intersection.normal
+                new_ray = Ray(origin=new_pos, direction=new_dir)
                 refracted = self.trace_ray(new_ray, depth=depth - 1, inside=inside ^ obj.has_volume(), eps=eps)
                 if refracted is not None:
-                    intensity += (1 if inside else material.albedo[2]) * refracted
+                    intensity += (1 if inside else material.albedo.z) * refracted
 
         return intensity
 
-    def tone_mapping(self, pixels, *, verbose: bool = True, eps: float = EPS):
+    def tone_mapping(self, pixels, background_color: Vector, *, eps: float = EPS):
         scale = pixels.max()
         if scale < eps:
+            pixels[:] = np.broadcast_to(background_color.to_array(), pixels.shape)
             return
 
-        iterable = tqdm.tqdm(
-            enumerate(pixels),
-            desc='Tone mapping',
-            total=len(pixels),
-            disable=not verbose,
+        pixels[:] = np.where(
+            np.isclose(pixels, NONE_ARRAY),
+            np.broadcast_to(background_color.to_array(), pixels.shape),
+            pixels * (1 + pixels / (scale ** 2)) / (1 + pixels),
         )
 
-        for j, row in iterable:
-            for i, pixel in enumerate(row):
-                pixels[j, i] = pixel * (1 + pixel / (scale ** 2)) / (1 + pixel)
+    def gamma_correction(self, pixels, *, gamma: float = 2.2, eps: float = EPS):
+        if pixels.max() > eps:
+            pixels **= 1 / gamma
 
-    def gamma_correction(self, pixels, *, gamma: float = 2.2, verbose: bool = True):
-        pixels **= 1 / gamma
-
-    def postprocess(self, pixels, *, gamma: float = 2.2, verbose: bool = True, eps: float = EPS):
-        self.tone_mapping(pixels, verbose=verbose, eps=eps)
-        self.gamma_correction(pixels, gamma=gamma, verbose=verbose)
+    def postprocess(self, pixels, background_color: Vector, *, gamma: float = 2.2, eps: float = EPS):
+        self.tone_mapping(pixels, background_color, eps=eps)
+        self.gamma_correction(pixels, gamma=gamma, eps=eps)
 
     def render(self,
                cam_options: CameraOptions,
@@ -182,47 +183,46 @@ class Scene:
                depth: float = 3,
                verbose: bool = True,
                eps: float = EPS,
-               parallel=False,
+               parallel: bool = False,
+               num_workers: int | None = None,
                ) -> Image.Image:
         if background_color is None:
             background_color = Vector(0, 0, 0)
 
         global _RENDER_SETTINGS, _SCENE
         _SCENE = self
-        _RENDER_SETTINGS = RenderSettings(
-            cam_options, eps, background_color, depth
-        )
+        _RENDER_SETTINGS = RenderSettings(cam_options, eps, depth)
         width, height = _RENDER_SETTINGS.width, _RENDER_SETTINGS.height
+
         pixels = np.empty((height, width, 3), dtype=float)
         if parallel:
             results = []
-            pool = multiprocessing.Pool()
-            for j in tqdm.tqdm(range(height), desc="Pool preparation", disable=not verbose):
-                results.append(pool.apply_async(_process_line, (j,)))
+            num_workers = num_workers or multiprocessing.cpu_count() - 1
+            with multiprocessing.Pool(num_workers) as pool:
+                for j in tqdm.tqdm(range(height), desc="Pool preparation", disable=not verbose):
+                    results.append(pool.apply_async(_process_line, (j,)))
 
-            for res in tqdm.tqdm(results, total=len(results), desc="Ray tracing"):
-                j, line = res.get()
-                pixels[j] = line
+                for res in tqdm.tqdm(results, total=len(results), desc="Ray tracing", disable=not verbose):
+                    j, line = res.get()
+                    pixels[j] = line
         else:
             for j in tqdm.tqdm(range(height), desc="Ray tracing", disable=not verbose):
                 pixels[j] = _process_line(j)[-1]
 
+        self.postprocess(pixels, background_color, eps=eps)
 
-        self.postprocess(pixels, verbose=verbose, eps=eps)
-
-        img = Image.fromarray(np.uint8(255 * np.clip(0, 1, pixels)))
+        img = Image.fromarray(np.uint8(np.clip(0, 255, 256 * pixels)))
         return img
 
 
-_SCENE: 'Scene' = None
-_RENDER_SETTINGS: 'RenderSettings' = None
+_SCENE: 'Scene' = None                     # type: ignore
+_RENDER_SETTINGS: 'RenderSettings' = None  # type: ignore
 
 
 @attr.s(slots=True)
 class RenderSettings:
     cam_options: CameraOptions = attr.ib()
     eps: float = attr.ib()
-    background_color: Vector = attr.ib()
     depth = attr.ib()
 
     width = attr.ib(default=None)
@@ -235,7 +235,7 @@ class RenderSettings:
     def __attrs_post_init__(self):
         self.width = self.cam_options.screen_width
         self.height = self.cam_options.screen_height
-    
+
         self.scale = math.tan(self.cam_options.fov / 2)
         self.aspect_ratio = self.width / self.height
         self.cam_to_world = look_at(self.cam_options.look_from, self.cam_options.look_to, eps=self.eps)
@@ -258,6 +258,6 @@ def _process_pixel(i, j):
 
     pixel = _SCENE.trace_ray(ray, depth=_RENDER_SETTINGS.depth, eps=_RENDER_SETTINGS.eps)
     if pixel is None:
-        pixel = _RENDER_SETTINGS.background_color
+        pixel = NONE_VECTOR
 
     return pixel.to_array()

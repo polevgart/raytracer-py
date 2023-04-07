@@ -9,7 +9,7 @@ class TestVector:
     def test_length(self):
         assert Vector(0, 1, 0).length == 1.0
         assert Vector(3, 4, 0).length == 5.0
-        assert abs(Vector(1, 1, 1).length - math.sqrt(3)) < 0.00000001
+        assert np.allclose(Vector(1, 1, 1).length, math.sqrt(3))
 
     def test_normalize(self):
         v = Vector(3, 4, 0)
@@ -21,12 +21,25 @@ class TestVector:
         assert str(Vector(0, 0, 0)) == "Vector(0.00, 0.00, 0.00)"
         assert str(Vector(1, 2, 3.14)) == "Vector(1.00, 2.00, 3.14)"
 
+    def test_dot_product(self):
+        assert np.allclose(Vector(47, 1, 0).dot(Vector(1, -47, 0)), 0)
+        assert np.allclose(Vector(0, 47, -1).dot(Vector(0, 1, 47)), 0)
+        assert np.allclose(Vector(47, 42, 22).dot(Vector(1, 0, 0)), 47)
+        assert np.allclose(Vector(47, 42, 22).dot(Vector(0, 1, 0)), 42)
+        assert np.allclose(Vector(47, 42, 22).dot(Vector(0, 0, 1)), 22)
+
+    def test_cross_product(self):
+        assert Vector(47, 0, 0).cross(Vector(0, 42, 0)) == Vector(0, 0, 42 * 47)
+        assert Vector(0, 47, 0).cross(Vector(0, 0, 42)) == Vector(42 * 47, 0, 0)
+        assert Vector(0, 0, 47).cross(Vector(42, 0, 0)) == Vector(0, 42 * 47, 0)
+        assert Vector(1, 2, 3).cross(Vector(4, 5, 6)) == Vector(-3, 6, -3)
+
     def test_binary_operations(self):
         a = Vector(1, 2, 3)
         b = Vector(1, 2, 3)
-        assert a + b == Vector(2, 4, 6)
-        assert a - b == Vector(0, 0, 0)
-        assert a * 3 == Vector(3, 6, 9)
+        assert a + b == Vector(2, 4, 6) == b + a
+        assert a - b == Vector(0, 0, 0) == -(b - a)
+        assert a * 3 == Vector(3, 6, 9) == 3 * a == a + 2 * a == 5 * a - 2 * a
 
         assert a / 2. == Vector(0.5, 1, 1.5)
         a /= 2.

@@ -22,7 +22,7 @@ class Triangle(BaseObject):
         if len(vertices) != 3:
             raise RuntimeError('Triangle has exactly three vertices most of the time.')
         super().__init__(**kwargs)
-        self._vertices=vertices
+        self._vertices = tuple(vertices)
 
     @property
     def area(self) -> float:

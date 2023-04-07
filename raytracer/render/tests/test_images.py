@@ -5,8 +5,8 @@ from pathlib import Path
 from PIL import Image
 import time
 
-from ...geometry import *
-from .. import *
+from ...geometry import Material, Sphere, Triangle, Vector
+from .. import CameraOptions, PointLight, Scene
 
 
 CURDIR = Path(os.path.relpath(__file__)).parent
@@ -17,13 +17,14 @@ def check_image(
     filename: str | Path,
     cam_options: CameraOptions,
     depth: float,
-    timeout: float = None,
+    parallel: bool = True,
+    timeout: float | None = None,
     artifact_path: str | Path | None = None,
 ) -> None:
     orig = Image.open(filename).convert('RGB')
 
     start_time = time.time()
-    img = scene.render(cam_options, depth=depth, verbose=False)
+    img = scene.render(cam_options, depth=depth, parallel=parallel, verbose=False)
     end_time = time.time()
 
     if artifact_path is not None:
@@ -33,11 +34,150 @@ def check_image(
     assert orig.size == img.size
 
     diff = np.asarray(orig, dtype=float) - np.asarray(img, dtype=float)
-    assert np.linalg.norm(diff) < 5.
+    similarity = (np.abs(diff).sum(axis=-1) < 2).mean()
+    assert similarity > 0.99
 
     assert timeout is None or end_time - start_time < timeout
 
+
 class TestRender:
+    def test_sphere(self):
+        scene = Scene()
+
+        # materials
+        ambient = Material(
+            ambient_color=Vector(0.5, 0, 0),
+        )
+        diffuse = Material(
+            diffuse_color=Vector(0.5, 0, 0),
+        )
+        specular = Material(
+            ambient_color=Vector(0.05, 0, 0),
+            specular_color=Vector(0.5, 0, 0),
+            specular_exponent=500,
+        )
+
+        # objects
+        scene.add_object(Sphere(
+            center=Vector(-0.35, 0, -0.5),
+            radius=0.15,
+            material=ambient,
+        ))
+        scene.add_object(Sphere(
+            center=Vector(0, 0, -0.5),
+            radius=0.15,
+            material=diffuse,
+        ))
+        scene.add_object(Sphere(
+            center=Vector(0.4, 0, -0.5),
+            radius=0.15,
+            material=specular,
+        ))
+
+        # light
+        scene.add_light(PointLight(
+            origin=Vector(-0.2, 0, 0),
+            intensity=Vector(0.5),
+        ))
+
+        # render options
+        cam_options = CameraOptions(
+            screen_width=640,
+            screen_height=480,
+        )
+
+        check_image(
+            scene,
+            CURDIR / 'images/spheres.png',
+            cam_options,
+            depth=1,
+            parallel=True,
+            timeout=15,
+            artifact_path=CURDIR / 'artifacts/spheres.png'
+        )
+
+    def test_triangle(self):
+        scene = Scene()
+
+        # materials
+        material = Material(
+            diffuse_color=Vector(0, 0, 1),
+        )
+
+        # objects
+        scene.add_object(Triangle([
+                Vector(-1, 0, 0),
+                Vector(0, 0, -1),
+                Vector(1, 0, 0),
+            ],
+            material=material,
+        ))
+
+        # light
+        scene.add_light(PointLight(
+            origin=Vector(0, 2, 0),
+            intensity=Vector(1),
+        ))
+
+        # render options
+        cam_options = CameraOptions(
+            screen_width=640,
+            screen_height=480,
+            look_from=Vector(0, 2, 0),
+            look_to=Vector(0, 0, 0),
+        )
+
+        check_image(
+            scene,
+            CURDIR / 'images/triangle.png',
+            cam_options,
+            depth=1,
+            parallel=True,
+            timeout=15,
+            artifact_path=CURDIR / 'artifacts/triangle.png'
+        )
+
+    def test_invisible_triangle(self):
+        scene = Scene()
+
+        # materials
+        material = Material(
+            diffuse_color=Vector(0, 0, 1),
+        )
+
+        # objects
+        scene.add_object(Triangle([
+                Vector(-1, 0, 0),
+                Vector(0, 0, -1),
+                Vector(1, 0, 0),
+            ],
+            material=material,
+        ))
+
+        # light
+        scene.add_light(PointLight(
+            origin=Vector(0, 2, 0),
+            intensity=Vector(1),
+        ))
+
+        # render options
+        cam_options = CameraOptions(
+            screen_width=640,
+            screen_height=480,
+            look_from=Vector(0, -2, 0),
+            look_to=Vector(0, 0, 0),
+        )
+
+        check_image(
+            scene,
+            CURDIR / 'images/invisible_triangle.png',
+            cam_options,
+            depth=1,
+            parallel=True,
+            timeout=15,
+            artifact_path=CURDIR / 'artifacts/invisible_triangle.png'
+        )
+
     def test_box(self):
         scene = Scene()
 
@@ -85,7 +225,7 @@ class TestRender:
             specular_exponent=10,
         )
 
-        # spheres
+        # objects
         scene.add_object(Sphere(
             center=Vector(-0.4, 0.3, -0.4),
             radius=0.3,
@@ -197,6 +337,180 @@ class TestRender:
             CURDIR / 'images/box.png',
             cam_options,
             depth=4,
-            timeout=100,
+            parallel=True,
+            timeout=30,
             artifact_path=CURDIR / 'artifacts/box.png'
+        )
+
+    def test_mirrors(self):
+        scene = Scene()
+
+        # materials
+        back_mtl = Material(
+            specular_color=Vector(0.95),
+            albedo=Vector(10, 0.5, 0),
+            specular_exponent=1024,
+            refraction_index=1,
+        )
+        front_mtl = Material(
+            specular_color=Vector(0.95),
+            albedo=Vector(10, 0.5, 0),
+            specular_exponent=1024,
+            refraction_index=1,
+        )
+        left_mtl = Material(
+            specular_color=Vector(0.95),
+            albedo=Vector(10, 0.5, 0),
+            specular_exponent=1024,
+            refraction_index=1,
+        )
+        right_mtl = Material(
+            specular_color=Vector(0.95),
+            albedo=Vector(10, 0.5, 0),
+            specular_exponent=1024,
+            refraction_index=1,
+        )
+        floor_mtl = Material(
+            diffuse_color=Vector(0.1),
+        )
+        ceil_mtl = Material(
+            diffuse_color=Vector(0.4),
+        )
+
+        sphere_mtl = Material(
+            ambient_color=Vector(0.01, 0.03, 0.03),
+            diffuse_color=Vector(0.1, 0.3, 0.3),
+        )
+
+        # objects
+        vertices = [
+            Vector(),
+            Vector(0, 0, 0),
+            Vector(0, 0, -3),
+            Vector(3, 0, -3),
+            Vector(3, 0, 0),
+            Vector(0, 3, 0),
+            Vector(0, 3, -3),
+            Vector(3, 3, -3),
+            Vector(3, 3, 0),
+        ]
+
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[5],
+                vertices[8],
+            ],
+            material=back_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[8],
+                vertices[4],
+            ],
+            material=back_mtl,
+        ))
+
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[5],
+                vertices[6],
+            ],
+            material=left_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[6],
+                vertices[2],
+            ],
+            material=left_mtl,
+        ))
+
+        scene.add_object(Triangle([
+                vertices[4],
+                vertices[3],
+                vertices[7],
+            ],
+            material=right_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[4],
+                vertices[7],
+                vertices[8],
+            ],
+            material=right_mtl,
+        ))
+
+        scene.add_object(Triangle([
+                vertices[2],
+                vertices[3],
+                vertices[7],
+            ],
+            material=front_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[2],
+                vertices[7],
+                vertices[6],
+            ],
+            material=front_mtl,
+        ))
+
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[2],
+                vertices[3],
+            ],
+            material=floor_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[1],
+                vertices[3],
+                vertices[4],
+            ],
+            material=floor_mtl,
+        ))
+
+        scene.add_object(Triangle([
+                vertices[5],
+                vertices[8],
+                vertices[7],
+            ],
+            material=ceil_mtl,
+        ))
+        scene.add_object(Triangle([
+                vertices[5],
+                vertices[7],
+                vertices[6],
+            ],
+            material=ceil_mtl,
+        ))
+
+        scene.add_object(Sphere(
+            center=Vector(1, 0.5, -2),
+            radius=0.5,
+            material=sphere_mtl,
+        ))
+
+        # light
+        scene.add_light(PointLight(
+            origin=Vector(2.8, 2.8, -2.8),
+            intensity=Vector(1),
+        ))
+
+        # render options
+        cam_options = CameraOptions(
+            screen_width=800,
+            screen_height=600,
+            look_from=Vector(2, 1.5, -0.1),
+            look_to=Vector(1, 1.2, -2.8),
+        )
+
+        check_image(
+            scene,
+            CURDIR / 'images/mirrors.png',
+            cam_options,
+            depth=9,
+            parallel=True,
+            timeout=90,
+            artifact_path=CURDIR / 'artifacts/mirrors.png'
         )

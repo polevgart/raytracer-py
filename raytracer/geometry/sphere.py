@@ -1,8 +1,8 @@
 import attr
 import math
 
+from .base import BaseObject, Intersection, Ray
 from .vector import Vector
-from . import base
 
 
 def solve_quadratic(a, b, c) -> tuple[float, float] | None:
@@ -28,11 +28,11 @@ def solve_quadratic(a, b, c) -> tuple[float, float] | None:
 
 
 @attr.s(slots=True, kw_only=True)
-class Sphere(base.BaseObject):
+class Sphere(BaseObject):
     center: Vector = attr.ib()
     radius: float = attr.ib(converter=float)
 
-    def intersect(self, ray: base.Ray) -> base.Intersection | None:
+    def intersect(self, ray: Ray) -> Intersection | None:
         origin = ray.origin
         dir = ray.direction
 
@@ -52,7 +52,7 @@ class Sphere(base.BaseObject):
         normal = self.get_normal(point)
         if c < 0:
             normal *= -1
-        return base.Intersection(point, normal, distance)
+        return Intersection(point, normal, distance)
 
     def get_normal(self, point: Vector) -> Vector:
         normal = point - self.center

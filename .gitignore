@@ -1,4 +1,7 @@
 misc/
+artifacts/
+image.png
+keklol*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

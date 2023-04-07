@@ -18,10 +18,6 @@ class Material:
         return Vector(1, 0, 0)
 
 
-class Texture:
-    pass
-
-
 @attr.s(slots=True)
 class Intersection:
     position: Vector = attr.ib()
@@ -32,7 +28,6 @@ class Intersection:
 @attr.s(slots=True, kw_only=True)
 class BaseObject:
     material: Material = attr.ib(default=None)
-    texture: Texture = attr.ib(default=None)
 
     def intersect(self, ray: Ray) -> Intersection | None:
         raise NotImplementedError()
