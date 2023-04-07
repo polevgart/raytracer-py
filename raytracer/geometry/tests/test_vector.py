@@ -1,5 +1,7 @@
 import math
+import numpy as np
 
+from ..ray import reflect, refract
 from ..vector import Vector
 
 
@@ -7,7 +9,7 @@ class TestVector:
     def test_length(self):
         assert Vector(0, 1, 0).length == 1.0
         assert Vector(3, 4, 0).length == 5.0
-        assert Vector(1, 1, 1).length - math.sqrt(3) < 0.00000001
+        assert abs(Vector(1, 1, 1).length - math.sqrt(3)) < 0.00000001
 
     def test_normalize(self):
         v = Vector(3, 4, 0)
@@ -35,3 +37,17 @@ class TestVector:
         assert isinstance(t, tuple)
         assert isinstance(t[0], float)
         assert t == (1., 2., 3.)
+
+    def test_reflect(self):
+        normal = Vector(0, 1, 0)
+        ray = Vector(0.707107, -0.707107, 0)
+        reflected = reflect(ray, normal)
+        assert np.allclose(reflected.x, 0.707107)
+        assert np.allclose(reflected.y, 0.707107)
+
+    def test_refract(self):
+        normal = Vector(0, 1, 0)
+        ray = Vector(0.707107, -0.707107, 0)
+        refracted = refract(ray, normal, 0.9)
+        assert np.allclose(refracted.x, 0.636396)
+        assert np.allclose(refracted.y, -0.771362)

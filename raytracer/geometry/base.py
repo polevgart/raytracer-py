@@ -1,18 +1,22 @@
 import attr
+import numpy as np
 
 from .ray import Ray
 from .vector import Vector
 
 
-class Color(Vector):
-    def to_tuple(self):
-        resp = super().to_tuple()
-        return tuple(map(int, resp))
-
-
 @attr.s(slots=True, kw_only=True)
 class Material:
-    color: Color = attr.ib()
+    ambient_color: Vector = attr.ib(factory=Vector)
+    diffuse_color: Vector = attr.ib(factory=Vector)
+    specular_color: Vector = attr.ib(factory=Vector)
+    specular_exponent: float = attr.ib(default=0)
+    refraction_index: float = attr.ib(default=1)
+    albedo: Vector = attr.ib()
+
+    @albedo.default
+    def _(self) -> Vector:
+        return Vector(1, 0, 0)
 
 
 class Texture:
@@ -33,9 +37,12 @@ class BaseObject:
 
     def intersect(self, ray: Ray) -> Intersection | None:
         raise NotImplementedError()
-    
+
     def get_normal(self, pos: Vector) -> Vector:
         raise NotImplementedError()
 
     def get_color(self, pos: Vector) -> Vector:
+        raise NotImplementedError()
+
+    def has_volume(self) -> bool:
         raise NotImplementedError()
